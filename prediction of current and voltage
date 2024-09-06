@@ -1,0 +1,49 @@
+import pandas as pd
+from sklearn.model_selection import train_test_split
+from sklearn.linear_model import LinearRegression
+from sklearn.metrics import mean_squared_error
+import numpy as np
+data_tk = pd.read_csv('/content/dataset_tk.csv')
+data_tk.rename(columns={data_tk.columns[0]: 'Date'}, inplace=True)
+data_tk['Date'] = pd.to_datetime(data_tk['Date'], format='%d/%m/%Y %H:%M:%S') # Changed the format to match the date format in the data
+data_tk.set_index('Date', inplace=True)
+
+# Handle any missing values by forward filling (optional)
+data_tk.fillna(method='ffill', inplace=True)
+
+# Extract the time component as a feature
+data_tk['TimeIndex'] = np.arange(len(data_tk))
+
+# Define the target column(s) - power consumption for different states
+states_columns = data_tk.columns.drop('TimeIndex')
+
+# Split the data into features (TimeIndex) and target (state power consumption)
+X = data_tk[['TimeIndex']]
+y = data_tk[states_columns]  # You can also choose specific states here
+
+# Split into training and test sets
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, shuffle=False)
+
+# Train a Linear Regression model for each state
+models = {}
+predictions = {}
+for state in y_train.columns:
+    model = LinearRegression()
+    model.fit(X_train, y_train[state])
+    models[state] = model
+    predictions[state] = model.predict(X_test)
+
+# Calculate Mean Squared Error for each state
+for state in y_train.columns:
+    mse = mean_squared_error(y_test[state], predictions[state])
+    print(f"{state} - MSE: {mse}")
+
+# Predict the next time step (future power consumption)
+next_time_step = np.array([[X['TimeIndex'].max() + 1]])
+future_predictions = {}
+for state, model in models.items():
+    future_predictions[state] = model.predict(next_time_step)[0]
+
+print("Future Power Consumption Predictions:")
+for state, prediction in future_predictions.items():
+    print(f"{state}: {prediction}")
